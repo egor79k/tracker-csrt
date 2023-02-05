@@ -24,12 +24,12 @@ int main(int argc, char **argv) {
 
     cv::cvtColor(frame, frame, cv::COLOR_BGR2GRAY);
  
-    cv::Rect rect = cv::selectROI(frame, false); 
-    cv::rectangle(frame, rect, cv::Scalar(255, 0, 0), 2);
- 
-    cv::imshow("Tracker", frame);
+    cv::Rect rect = cv::selectROI(frame, false);
     
     TrackerCSRT tracker(frame, rect);
+
+    cv::rectangle(frame, rect, cv::Scalar(255, 0, 0), 2); 
+    cv::imshow("Tracker", frame);
      
     while(video.read(frame)) {
         cv::cvtColor(frame, frame, cv::COLOR_BGR2GRAY);

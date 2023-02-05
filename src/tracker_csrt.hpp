@@ -44,14 +44,15 @@ private:
      * \brief Convolves an image with the filter
      * 
      * \param[in] src Input image
-     * \param[in] filter Convolution kernel
+     * \param[in] kernel Convolution kernel
      * \param[in] dst Output image of the same size as src
      */
-    void convolution(const cv::Mat1f& src, const cv::Mat1f& filter, cv::Mat1f& dst);
+    void convolve(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
+    // void convolution(const cv::Mat1f& src, const cv::Mat1f& filter, cv::Mat1f& dst);
 
     cv::Mat1f filter;
     std::vector<cv::Mat1f> channels;
-    std::vector<float> channel_weights;
+    std::vector<float> channelWeights;
 };
 
 
