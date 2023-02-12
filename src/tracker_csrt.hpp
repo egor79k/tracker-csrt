@@ -48,6 +48,7 @@ private:
      * \param[in] dst Output image of the same size as src
      */
     void convolve(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
+    void convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
     // void convolution(const cv::Mat1f& src, const cv::Mat1f& filter, cv::Mat1f& dst);
 
     cv::Mat1f filter;

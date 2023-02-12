@@ -110,13 +110,20 @@ void TrackerCSRT::convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv
     cudaMallocPitch(&dKernelFFT, &dKernelFFTPitch, width * sizeof(cufftComplex), height);
 
     // Apply FFT to src and kernel
-    cufftHandle plan;
-    cufftPlan2d(&plan, width, height, CUFFT_R2C);
-    cufftExecR2C(plan, dSrc, dSrcFFT);
-    cufftExecR2C(plan, dKernel, dKernelFFT);
-    cufftDestroy(plan);
+    cufftHandle plan1;
+    cufftPlan2d(&plan1, width, height, CUFFT_R2C);
+    cufftExecR2C(plan1, dSrc, dSrcFFT);
+    cufftExecR2C(plan1, dKernel, dKernelFFT);
+    cufftDestroy(plan1);
 
+    // Multiply elementwise src and kernel in Fourier domain
     ComplexPointwiseMulAndScale<<<32, 256>>>(dSrcFFT, dKernelFFT, width * height, 1.0f / (width * height));
+
+    // Apply IFFT to src
+    cufftHandle plan2;
+    cufftPlan2d(&plan2, width, height, CUFFT_C2R);
+    cufftExecC2R(plan2, dSrcFFT, dSrc);
+    cufftDestroy(plan2);
 
     cv::Mat1f hSrc = cv::Mat1f::zeros(height, width);
     cudaMemcpy2D(hSrc.data, width * sizeof(float), dSrc, dSrcPitch, width * sizeof(float), height, cudaMemcpyDeviceToHost);
