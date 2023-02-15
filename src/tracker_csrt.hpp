@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include <cufft.h>
 
 
 /**
@@ -19,6 +20,11 @@ public:
      * \param[in] bbox Initial bounding box of the tracked object
      */
     TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox);
+
+    /**
+     * \brief Destructor
+     */
+    ~TrackerCSRT();
 
     /**
      * \brief Makes one step of algorithm
@@ -47,13 +53,25 @@ private:
      * \param[in] kernel Convolution kernel
      * \param[in] dst Output image of the same size as src
      */
-    void convolve(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
     void convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
-    // void convolution(const cv::Mat1f& src, const cv::Mat1f& filter, cv::Mat1f& dst);
+
+    /**
+     * \brief Convolves an image with the filter
+     * 
+     * \param[in] src Input image
+     * \param[in] kernel Convolution kernel
+     * \param[in] dst Output image of the same size as src
+     */
+    void convolveOpenCV(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
 
     cv::Mat1f filter;
     std::vector<cv::Mat1f> channels;
     std::vector<float> channelWeights;
+
+    float* dSrc;
+    float* dKernel;
+    cufftComplex* dSrcFFT;
+    cufftComplex* dKernelFFT;
 };
 
 
