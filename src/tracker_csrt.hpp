@@ -63,8 +63,9 @@ private:
      * \param[in] dst Output image of the same size as src
      */
     void convolveOpenCV(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
+    
 
-    cv::Mat1f filter;
+    std::vector<cv::Mat1f> filters;
     std::vector<cv::Mat1f> channels;
     std::vector<float> channelWeights;
 

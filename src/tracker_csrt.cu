@@ -6,6 +6,14 @@
 typedef float2 Complex;
 
 
+// Complex conjugate
+static __device__ __host__ inline Complex ComplexConjugate(Complex a) {
+  Complex c;
+  c.x = a.x;
+  c.y = -a.y;
+  return c;
+}
+
 // Complex addition
 static __device__ __host__ inline Complex ComplexAdd(Complex a, Complex b) {
   Complex c;
@@ -36,16 +44,23 @@ static __global__ void ComplexPointwiseMulAndScale(Complex *a, const Complex *b,
   const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (int i = threadID; i < size; i += numThreads) {
-    a[i] = ComplexScale(ComplexMul(a[i], b[i]), scale);
+    a[i] = ComplexScale(ComplexMul(a[i], ComplexConjugate(b[i])), scale);
   }
 }
 
 
 TrackerCSRT::TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox) :
-    filter(frame, bbox),
-    channels(1),
-    channelWeights(1)
+    filters(3),
+    channels(3),
+    channelWeights(3)
 {
+    std::vector<cv::Mat1f> temp(3);
+    cv::split(cv::Mat(frame, bbox), temp.data());
+
+    for (int channel_id = 0; channel_id < filters.size(); ++ channel_id) {
+        temp[channel_id].convertTo(filters[channel_id], CV_32F);
+    }
+
     size_t realSize = bbox.width * bbox.height * sizeof(float);
     size_t complexSize = bbox.width * bbox.height * sizeof(cufftComplex);
 
@@ -162,26 +177,32 @@ void TrackerCSRT::convolveOpenCV(const cv::Mat1f& src, const cv::Mat1f& kernel, 
 
 
 bool TrackerCSRT::update(const cv::Mat& frame, cv::Rect& bbox) {
-    // Temporary use just grayscale channel with 1.0 weight
-    cv::Mat1f(frame, bbox).convertTo(channels[0], CV_32F);
-    channelWeights[0] = 1.0f;
+    std::vector<cv::Mat1f> temp(3);
+    cv::split(cv::Mat(frame, bbox), temp.data());
 
-    // cv::Rect wrappedRoi(bbox.width / 2, bbox.height / 2, bbox.width * 2, bbox.height * 2);
+    for (int channel_id = 0; channel_id < channels.size(); ++ channel_id) {
+        temp[channel_id].convertTo(channels[channel_id], CV_32F);
+    }
+
+    channelWeights[0] = 1.0f;
+    channelWeights[1] = 1.0f;
+    channelWeights[2] = 1.0f;
+
     cv::Mat1f resultingConvolution = cv::Mat::zeros(bbox.height, bbox.width, CV_32F);
     cv::Mat1f channelConvolution;
 
     for (int channel_id = 0; channel_id < channels.size(); ++channel_id) {
-        getChannelFilter(channel_id, filter);
+        // getChannelFilter(channel_id, filter);
 
-        // Replicate image to caclulate cyclic convolution
-        // cv::Mat1f wrappedChannel(cv::repeat(channels[channel_id], 3, 3), wrappedRoi);
-
-        // convolveCUDA(wrappedChannel, filter, channelConvolution);
-        convolveCUDA(channels[channel_id], filter, channelConvolution);
+        convolveCUDA(channels[channel_id], filters[channel_id], channelConvolution);
 
         // Add weighted channel convolution to resulting response
         resultingConvolution = resultingConvolution + channelConvolution * channelWeights[channel_id];
     }
+
+    // cv::normalize(resultingConvolution, resultingConvolution, 0, 1, cv::NORM_MINMAX);
+    // cv::imshow("Conv", resultingConvolution);
+    // cv::waitKey(0);
 
     // Find the location of maximum in convolution response
     double minVal;
@@ -191,8 +212,8 @@ bool TrackerCSRT::update(const cv::Mat& frame, cv::Rect& bbox) {
     cv::minMaxLoc(resultingConvolution, &minVal, &maxVal, &minLoc, &maxLoc);
 
     // Move the bounding box according to maximum
-    bbox += (minLoc - cv::Point(bbox.width / 2, bbox.height / 2));
-    // cv::Mat1f(frame, bbox).convertTo(filter, CV_32F);
+    // bbox += (maxLoc - cv::Point(bbox.width / 2, bbox.height / 2));
+    bbox += (maxLoc - cv::Point(bbox.width * static_cast<int>(2 * maxLoc.x / bbox.width), bbox.height * static_cast<int>(2 * maxLoc.y / bbox.height)));
 
     return true;
 }
