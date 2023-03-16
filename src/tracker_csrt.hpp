@@ -38,16 +38,20 @@ public:
     bool update(const cv::Mat& frame, cv::Rect& bbox);
 
 private:
-
-    void buildGaussian(cv::Mat1f& dst);
-    
     /**
-     * \brief Calculates convolution filter for channel
+     * \brief Extracts template from frame and splits it into channels
      * 
-     * \param[in] channel_id Channel index
-     * \param[in] filter Result destination
+     * \param[in] frame Current frame of the video
+     * \param[in] bbox Bounding box of the tracked object in the current frame
      */
-    void getChannelFilter(const int channel_id, cv::Mat1f& filter);
+    void updateChannels(const cv::Mat& frame, const cv::Rect& bbox);
+
+    /**
+     * \brief Calcultes Gaussian kernel with size of dst
+     * 
+     * \param[in] dst Output matrix
+     */
+    void buildGaussian(cv::Mat1f& dst);
 
     /**
      * \brief Convolves an image with the filter
@@ -67,9 +71,25 @@ private:
      */
     void convolveOpenCV(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
     
-
+    /**
+     * \brief Updates object location in the next frame
+     * Estimates a new position of the object
+     * as the max in weighted channel correlation response
+     * 
+     * \param[in] bbox Bounding box of the tracked object to update
+     */
     void updateLocation(cv::Rect& bbox);
+
+    /**
+     * \brief Builds segmentation mask of the object
+     * 
+     * \param[in] map Output reliability map
+     */
     void estimateReliabilityMap(cv::Mat& map);
+
+    /**
+     * \brief Updates channel filters
+     */
     void updateFilter();
 
 

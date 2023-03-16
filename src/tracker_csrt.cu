@@ -75,6 +75,11 @@ TrackerCSRT::TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox) :
     cudaMalloc(&dKernelFFT, complexSize);
 
     buildGaussian(idealResponse);
+
+    // Temporary use constant weights
+    channelWeights[0] = 1.0f;
+    channelWeights[1] = 1.0f;
+    channelWeights[2] = 1.0f;
 }
 
 
@@ -87,22 +92,25 @@ TrackerCSRT::~TrackerCSRT() {
 
 
 bool TrackerCSRT::update(const cv::Mat& frame, cv::Rect& bbox) {
+    updateChannels(frame, bbox);
+
+    updateLocation(bbox);
+
+    updateChannels(frame, bbox);
+    
+    updateFilter();
+
+    return true;
+}
+
+
+void TrackerCSRT::updateChannels(const cv::Mat& frame, const cv::Rect& bbox) {
     std::vector<cv::Mat1f> temp(3);
     cv::split(cv::Mat(frame, bbox), temp.data());
 
     for (int channelId = 0; channelId < channels.size(); ++ channelId) {
         temp[channelId].convertTo(channels[channelId], CV_32F);
     }
-
-    channelWeights[0] = 1.0f;
-    channelWeights[1] = 1.0f;
-    channelWeights[2] = 1.0f;
-
-    updateLocation(bbox);
-    
-    updateFilter();
-
-    return true;
 }
 
 
@@ -126,15 +134,6 @@ void TrackerCSRT::buildGaussian(cv::Mat1f& dst) {
     }
 
     dst /= sum;
-
-    // cv::normalize(dst, dst, 0, 1, cv::NORM_MINMAX);
-    // cv::imshow("Gaussian", dst);
-    // cv::waitKey(0);
-}
-
-
-void TrackerCSRT::getChannelFilter(const int channelId, cv::Mat1f& filter) {
-    // Calculate the closed-form solution for channel filter using formula (4)
 }
 
 
@@ -185,10 +184,6 @@ void TrackerCSRT::convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv
     // Copy result to host
     dst = cv::Mat1f::zeros(height, width);
     cudaMemcpy2D(dst.data, width * sizeof(float), dSrc, width * sizeof(float), width * sizeof(float), height, cudaMemcpyDeviceToHost);
-
-    // cv::normalize(dst, dst, 0, 1, cv::NORM_MINMAX);
-    // cv::imshow("Copy", dst);
-    // cv::waitKey(0);
 }
 
 
@@ -314,4 +309,9 @@ void TrackerCSRT::updateFilter() {
 
         filters[channelId] = (1 - filterAdaptationRate) * filters[channelId] + filterAdaptationRate * filter;
     }
+
+    // Show filter
+    // cv::Mat temp3;
+    // cv::normalize(filters[0], temp3, 0, 1, cv::NORM_MINMAX);
+    // cv::imshow("Filter", temp3);
 }
