@@ -1,5 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include "tracker_csrt.hpp"
+#include <chrono>
 
 
 int main(int argc, char **argv) {
@@ -35,7 +36,14 @@ int main(int argc, char **argv) {
         video_writer.open(argv[2], cv::VideoWriter::fourcc('M','P','4','V'), 24, frame.size());
     }
 
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
     while(video.read(frame)) {
+        end = std::chrono::steady_clock::now();
+        std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+        begin = std::chrono::steady_clock::now();
+
         if (tracker.update(frame, rect)) {
             cv::rectangle(frame, rect, cv::Scalar(255, 0, 0), 2);
         }

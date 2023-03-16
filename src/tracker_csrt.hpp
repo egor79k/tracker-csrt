@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <opencv2/opencv.hpp>
+// #include <opencv2/core/eigen.hpp>
 #include <cufft.h>
 
 
@@ -37,6 +38,8 @@ public:
     bool update(const cv::Mat& frame, cv::Rect& bbox);
 
 private:
+
+    void buildGaussian(cv::Mat1f& dst);
     
     /**
      * \brief Calculates convolution filter for channel
@@ -65,14 +68,22 @@ private:
     void convolveOpenCV(const cv::Mat1f& src, const cv::Mat1f& kernel, cv::Mat1f& dst);
     
 
+    void updateLocation(cv::Rect& bbox);
+    void estimateReliabilityMap(cv::Mat& map);
+    void updateFilter();
+
+
     std::vector<cv::Mat1f> filters;
     std::vector<cv::Mat1f> channels;
     std::vector<float> channelWeights;
+    cv::Mat1f idealResponse;
 
     float* dSrc;
     float* dKernel;
     cufftComplex* dSrcFFT;
     cufftComplex* dKernelFFT;
+
+    static const float filterAdaptationRate;
 };
 
 
