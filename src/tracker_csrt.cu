@@ -23,11 +23,27 @@ static __device__ __host__ inline Complex ComplexAdd(Complex a, Complex b) {
   return c;
 }
 
+// Complex substraction
+static __device__ __host__ inline Complex ComplexSub(Complex a, Complex b) {
+  Complex c;
+  c.x = a.x - b.x;
+  c.y = a.y - b.y;
+  return c;
+}
+
 // Complex scale
 static __device__ __host__ inline Complex ComplexScale(Complex a, float s) {
   Complex c;
   c.x = s * a.x;
   c.y = s * a.y;
+  return c;
+}
+
+// Complex division
+static __device__ __host__ inline Complex ComplexDiv(Complex a, Complex b) {
+  Complex c;
+  c.x = a.x * b.x - a.y * b.y;
+  c.y = a.x * b.y + a.y * b.x;
   return c;
 }
 
@@ -39,14 +55,117 @@ static __device__ __host__ inline Complex ComplexMul(Complex a, Complex b) {
   return c;
 }
 
-// Complex pointwise multiplication
-static __global__ void ComplexPointwiseMulAndScale(Complex *a, const Complex *b, int size, float scale) {
-  const int numThreads = blockDim.x * gridDim.x;
-  const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+// Complex pointwise multiplication with conjugating and scaling
+static __global__ void ComplexPointwiseMulConjScale(const Complex* a, const Complex* b, Complex* c, int size, float scale) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
-  for (int i = threadID; i < size; i += numThreads) {
-    a[i] = ComplexScale(ComplexMul(a[i], ComplexConjugate(b[i])), scale);
-  }
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexScale(ComplexMul(a[i], ComplexConjugate(b[i])), scale);
+    }
+}
+
+// Complex pointwise scaling
+static __global__ void ComplexPointwiseDiv(const Complex* a, const float *b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexDiv(a[i], b[i]);
+    }
+}
+
+// Complex pointwise scaling
+static __global__ void ComplexPointwiseScale(const Complex* a, const float *b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexScale(a[i], b[i]);
+    }
+}
+
+// Complex pointwise adding
+static __global__ void ComplexPointwiseAdd(const Complex* a, const float *b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexAdd(a[i], b[i]);
+    }
+}
+
+// Complex pointwise substracting
+static __global__ void ComplexPointwiseSub(const Complex* a, const float *b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexSub(a[i], b[i]);
+    }
+}
+
+// Complex scalar scaling
+static __global__ void ComplexScalarScale(const Complex* a, const float b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = ComplexScale(a[i], b);
+    }
+}
+
+// Complex scalar adding
+static __global__ void ComplexScalarAdd(const Complex* a, const float b, Complex* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i].x = a[i].x + b;
+        c[i].y = a[i].y;
+    }
+}
+
+// Complex scalar scaling
+static __global__ void ComplexFill(Complex* a, const Complex b, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        a[i].x = b.x;
+        a[i].y = b.y;
+    }
+}
+
+// Complex scalar scaling
+static __global__ void ComplexConvert(const float *a, Complex* b, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        b[i].x = a[i];
+        b[i].y = 0;
+    }
+}
+
+// Complex pointwise multiplication
+static __global__ void RealPointwiseMul(const float* a, const float *b, float* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = a[i] * b[i];
+    }
+}
+
+// Complex scalar multiplication
+static __global__ void RealScalarMul(const float* a, const float b, float* c, int size) {
+    const int numThreads = blockDim.x * gridDim.x;
+    const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = threadID; i < size; i += numThreads) {
+        c[i] = a[i] * b;
+    }
 }
 
 
@@ -69,12 +188,28 @@ TrackerCSRT::TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox) :
     size_t realSize = bbox.width * bbox.height * sizeof(float);
     size_t complexSize = bbox.width * bbox.height * sizeof(cufftComplex);
 
+    buildGaussian(idealResponse);
+
     cudaMalloc(&dSrc, realSize);
     cudaMalloc(&dKernel, realSize);
+    cudaMalloc(&dGaussian, realSize);
+    cudaMalloc(&dRelMap, realSize);
     cudaMalloc(&dSrcFFT, complexSize);
     cudaMalloc(&dKernelFFT, complexSize);
+    cudaMalloc(&dGaussianFFT, complexSize);
+    cudaMalloc(&dLagrangianFFT, complexSize);
+    cudaMalloc(&dConv1, complexSize);
+    cudaMalloc(&dConv2, complexSize);
+    cudaMalloc(&dTemp1, complexSize);
+    // cudaMalloc(&dTemp2, complexSize);
+    
+    // Apply FFT to idealResponse
+    cudaMemcpy2D(dGaussian, width * sizeof(float), idealResponse.data, width * sizeof(float), width * sizeof(float), height, cudaMemcpyHostToDevice);
+    cufftHandle plan1;
+    cufftPlan2d(&plan1, height, width, CUFFT_R2C);
+    cufftExecR2C(plan1, dGaussian, dSrcFFT);
+    cufftDestroy(plan1);
 
-    buildGaussian(idealResponse);
 
     // Temporary use constant weights
     channelWeights[0] = 1.0f;
@@ -86,8 +221,16 @@ TrackerCSRT::TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox) :
 TrackerCSRT::~TrackerCSRT() {
     cudaFree(dSrc);
     cudaFree(dKernel);
+    cudaFree(dGaussian);
+    cudaFree(dRelMap);
     cudaFree(dSrcFFT);
     cudaFree(dKernelFFT);
+    cudaFree(dGaussianFFT);
+    cudaFree(dLagrangianFFT);
+    cudaFree(dConv1);
+    cudaFree(dConv2);
+    cudaFree(dTemp1);
+    // cudaFree(dTemp2);
 }
 
 
@@ -173,7 +316,7 @@ void TrackerCSRT::convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv
     cufftDestroy(plan1);
 
     // Multiply elementwise srcTemp and kernel in Fourier domain
-    ComplexPointwiseMulAndScale<<<32, 256>>>(dSrcFFT, dKernelFFT, width * height, 1.0f / (width * height));
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dSrcFFT, dKernelFFT, dSrcFFT, width * height, 1.0f / (width * height));
 
     // Apply IFFT to srcTemp
     cufftHandle plan2;
@@ -229,15 +372,27 @@ void TrackerCSRT::updateLocation(cv::Rect& bbox) {
     cv::Mat1f resultingConvolution = cv::Mat::zeros(bbox.height, bbox.width, CV_32F);
     cv::Mat1f channelConvolution;
 
-    for (int channelId = 0; channelId < channels.size(); ++channelId) {
-        // getChannelFilter(channelId, filter);
+    double minVal;
+    double maxVal;
+    double weightsSum = 0;
+    cv::Point minLoc;
+    cv::Point maxLoc;
 
+    for (int channelId = 0; channelId < channels.size(); ++channelId) {
         convolveCUDA(channels[channelId], filters[channelId], channelConvolution);
 
         // Add weighted channel convolution to resulting response
         resultingConvolution = resultingConvolution + channelConvolution * channelWeights[channelId];
 
-        filters[channelId] = 0.98 * filters[channelId] + 0.02 * channels[channelId];
+        // Update weight by channel learning reliability
+        cv::minMaxLoc(channelConvolution, &minVal, &maxVal, &minLoc, &maxLoc);
+        channelWeights[channelId] = (1 - filterAdaptationRate) * channelWeights[channelId] + filterAdaptationRate * maxVal;
+        weightsSum += channelWeights[channelId];
+    }
+
+    // Normalize weights
+    for (int channelId = 0; channelId < channels.size(); ++channelId) {
+        channelWeights[channelId] /= weightsSum;
     }
 
     // Show correlation response in the frame corner
@@ -250,10 +405,6 @@ void TrackerCSRT::updateLocation(cv::Rect& bbox) {
     // cv::waitKey(0);
 
     // Find the location of maximum in convolution response
-    double minVal;
-    double maxVal;
-    cv::Point minLoc;
-    cv::Point maxLoc;
     cv::minMaxLoc(resultingConvolution, &minVal, &maxVal, &minLoc, &maxLoc);
 
     // Move the bounding box according to maximum
@@ -285,33 +436,118 @@ void TrackerCSRT::updateFilter() {
     const float denomIncrement = lambda / (2 * D);
 
     for (int channelId = 0; channelId < channels.size(); ++channelId) {
-        cv::Mat1f filter = filters[channelId].clone();
-        cv::Mat1f trainROI = channels[channelId];
-        cv::Mat1f L = cv::Mat1f::zeros(filter.rows, filter.cols);
+        // cv::Mat1f filter = filters[channelId].clone();
+        // cv::Mat1f trainROI = channels[channelId];
+        // cv::Mat1f L = cv::Mat1f::zeros(filter.rows, filter.cols);
 
-        int iter = 1;
+        // int iter = 3;
 
-        while (iter--) {
-            convolveCUDA(trainROI, idealResponse, temp1);
-            convolveCUDA(trainROI, trainROI, temp2);
+        // while (iter--) {
+        //     convolveCUDA(trainROI, idealResponse, temp1);
+        //     convolveCUDA(trainROI, trainROI, temp2);
 
-            cv::multiply(filter, relMap, maskedFilter);
-            cv::divide(temp1 + (filterAdaptationRate * maskedFilter - L), temp2 + mu, constrainedFilter);
+        //     cv::multiply(filter, relMap, maskedFilter);
+        //     cv::divide(temp1 + (filterAdaptationRate * maskedFilter - L), temp2 + mu, constrainedFilter);
             
-            cv::idft(L + mu * constrainedFilter, temp1, 0, filter.rows);
-            cv::multiply(relMap, temp1, temp2);
-            filter = temp2 / (denomIncrement + mu);
+        //     cv::idft(L + mu * constrainedFilter, temp1, 0, filter.rows);
+        //     cv::multiply(relMap, temp1, temp2);
+        //     filter = temp2 / (denomIncrement + mu);
 
-            L = L + filterAdaptationRate * (constrainedFilter - filter);
+        //     L = L + filterAdaptationRate * (constrainedFilter - filter);
 
-            mu *= beta;
-        }
+        //     mu *= beta;
+        // }
+
+        cv::Mat filter;
+        estimateFilter(channelId, relMap, filter);
 
         filters[channelId] = (1 - filterAdaptationRate) * filters[channelId] + filterAdaptationRate * filter;
+
+        // cv::Mat temp3;
+        // cv::normalize(filter, temp3, 0, 1, cv::NORM_MINMAX);
+        // cv::imshow("Filter", temp3);
     }
 
     // Show filter
     // cv::Mat temp3;
     // cv::normalize(filters[0], temp3, 0, 1, cv::NORM_MINMAX);
     // cv::imshow("Filter", temp3);
+}
+
+
+void TrackerCSRT::estimateFilter(const int channelId, const cv::Mat1f& relMap, cv::Mat1f& newFilter) {
+    cv::Mat1f oldFilter = filters[channelId];
+    cv::Mat1f trainROI = channels[channelId];
+
+    size_t width = old_filter.cols;
+    size_t height = old_filter.rows;
+
+    float* dOldFilter = dSrc;
+    float* dTrainROI = dKernel;
+    Complex* dOldFilterFFT = dSrcFFT;
+    Complex* dTrainROIFFT = dKernelFFT;
+
+    // Copy src and kernel to device
+    cudaMemcpy2D(dOldFilter, width * sizeof(float), oldFilter.data, width * sizeof(float), width * sizeof(float), height, cudaMemcpyHostToDevice);
+    cudaMemcpy2D(dTrainROI, width * sizeof(float), trainROI.data, width * sizeof(float), width * sizeof(float), height, cudaMemcpyHostToDevice);
+    cudaMemcpy2D(dRelMap, width * sizeof(float), relMap.data, width * sizeof(float), width * sizeof(float), height, cudaMemcpyHostToDevice);
+
+    // Initialize filter FFT with old filter
+    ComplexConvert<<<32, 256>>>(dOldFilter, dOldFilterFFT, width * height);
+
+    // Initialize Lagrangian FFT with zeros
+    ComplexFill<<<32, 256>>>(dLagrangianFFT, {0, 0}, width * height);
+
+    // Create FFT and IFFT plans
+    cufftHandle plan1;
+    cufftPlan2d(&plan1, height, width, CUFFT_R2C);
+    cufftHandle plan2;
+    cufftPlan2d(&plan2, height, width, CUFFT_C2R);
+
+    // Apply FFT to srcTemp and kernel
+    // cufftExecR2C(plan1, dSrc, dSrcFFT);
+    cufftExecR2C(plan1, dTrainROI, dTrainROIFFT);
+
+    // Multiply elementwise srcTemp and kernel in Fourier domain
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dGaussianFFT, dConv1, width * height, 1.0f / (width * height));
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dTrainROIFFT, dConv2, width * height, 1.0f / (width * height));
+
+    int iter = 3;
+
+    while (iter--) {
+        // Masked filter
+        ComplexPointwiseScale<<<32, 256>>>(dOldFilterFFT, dRelMap, dOldFilterFFT, width * height);
+
+        // Calculate constrained filter into dOldFilterFFT
+        ComplexScalarScale<<<32, 256>>>(dOldFilterFFT, filterAdaptationRate, dOldFilterFFT, width * height);
+        ComplexPointwiseSub<<<32, 256>>>(dOldFilterFFT, dLagrangianFFT, dOldFilterFFT, width * height);
+        ComplexPointwiseAdd<<<32, 256>>>(dConv1, dOldFilterFFT, dOldFilterFFT, width * height);
+        ComplexScalarAdd<<<32, 256>>>(dConv2, mu, dTemp1, width * height);
+        ComplexPointwiseDiv<<<32, 256>>>(dOldFilterFFT, dTemp1, dOldFilterFFT, width * height);
+
+        // Calculate new filter into dOldFilter
+        ComplexScalarScale<<<32, 256>>>(dOldFilterFFT, mu, dTemp1, width * height);
+        ComplexPointwiseAdd<<<32, 256>>>(dLagrangianFFT, dTemp1, dTemp1, width * height);
+
+        // Apply IFFT to srcTemp
+        cufftExecC2R(plan2, dTemp1, dOldFilter);
+
+        RealPointwiseMul<<<32, 256>>>(dRelMap, dOldFilter, dOldFilter, width * height);
+        RealScalarMul<<<32, 256>>>(dOldFilter, 1 / (denomIncrement + mu), dOldFilter, width * height);
+
+        // Update Lagrangian
+        cufftExecR2C(plan1, dOldFilter, dTemp1);
+        ComplexPointwiseSub<<<32, 256>>>(dOldFilterFFT, dTemp1, dTemp1, width * height);
+        ComplexScalarScale<<<32, 256>>>(dTemp1, filterAdaptationRate, dTemp1, width * height);
+        ComplexPointwiseAdd<<<32, 256>>>(dLagrangianFFT, dTemp1, dLagrangianFFT, width * height);
+
+        mu *= beta;
+    }
+
+    cufftDestroy(plan1);
+    cufftDestroy(plan2);
+
+    // Copy result to host
+    newFilter = cv::Mat1f::zeros(height, width);
+    cudaMemcpy2D(newFilter.data, width * sizeof(float), dOldFilter, width * sizeof(float), width * sizeof(float), height, cudaMemcpyDeviceToHost);
 }

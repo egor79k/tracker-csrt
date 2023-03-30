@@ -92,6 +92,8 @@ private:
      */
     void updateFilter();
 
+    void estimateFilter(const cv::Mat1f& oldFilter, const cv::Mat1f& relMap, cv::Mat1f& newFilter);
+
 
     std::vector<cv::Mat1f> filters;
     std::vector<cv::Mat1f> channels;
@@ -100,8 +102,16 @@ private:
 
     float* dSrc;
     float* dKernel;
+    float* dGaussian;
+    float* dRelMap;
     cufftComplex* dSrcFFT;
     cufftComplex* dKernelFFT;
+    cufftComplex* dGaussianFFT;
+    cufftComplex* dLagrangianFFT;
+    cufftComplex* dConv1;
+    cufftComplex* dConv2;
+    cufftComplex* dTemp1;
+    // cufftComplex* dTemp2;
 
     static const float filterAdaptationRate;
 };
