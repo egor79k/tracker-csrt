@@ -92,7 +92,7 @@ private:
      */
     void updateFilter();
 
-    void estimateFilter(const cv::Mat1f& oldFilter, const cv::Mat1f& relMap, cv::Mat1f& newFilter);
+    void estimateFilter(const int channelId, const cv::Mat1f& relMap, cv::Mat1f& newFilter);
 
 
     std::vector<cv::Mat1f> filters;

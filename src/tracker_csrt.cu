@@ -8,7 +8,7 @@ typedef float2 Complex;
 
 
 // Complex conjugate
-static __device__ __host__ inline Complex ComplexConjugate(Complex a) {
+static __device__ __host__ inline Complex ComplexConjugate(const Complex a) {
   Complex c;
   c.x = a.x;
   c.y = -a.y;
@@ -16,7 +16,7 @@ static __device__ __host__ inline Complex ComplexConjugate(Complex a) {
 }
 
 // Complex addition
-static __device__ __host__ inline Complex ComplexAdd(Complex a, Complex b) {
+static __device__ __host__ inline Complex ComplexAdd(const Complex a, const Complex b) {
   Complex c;
   c.x = a.x + b.x;
   c.y = a.y + b.y;
@@ -24,7 +24,7 @@ static __device__ __host__ inline Complex ComplexAdd(Complex a, Complex b) {
 }
 
 // Complex substraction
-static __device__ __host__ inline Complex ComplexSub(Complex a, Complex b) {
+static __device__ __host__ inline Complex ComplexSub(const Complex a, const Complex b) {
   Complex c;
   c.x = a.x - b.x;
   c.y = a.y - b.y;
@@ -32,7 +32,7 @@ static __device__ __host__ inline Complex ComplexSub(Complex a, Complex b) {
 }
 
 // Complex scale
-static __device__ __host__ inline Complex ComplexScale(Complex a, float s) {
+static __device__ __host__ inline Complex ComplexScale(const Complex a, const float s) {
   Complex c;
   c.x = s * a.x;
   c.y = s * a.y;
@@ -40,7 +40,7 @@ static __device__ __host__ inline Complex ComplexScale(Complex a, float s) {
 }
 
 // Complex division
-static __device__ __host__ inline Complex ComplexDiv(Complex a, Complex b) {
+static __device__ __host__ inline Complex ComplexDiv(const Complex a, const Complex b) {
   Complex c;
   c.x = a.x * b.x - a.y * b.y;
   c.y = a.x * b.y + a.y * b.x;
@@ -48,7 +48,7 @@ static __device__ __host__ inline Complex ComplexDiv(Complex a, Complex b) {
 }
 
 // Complex multiplication
-static __device__ __host__ inline Complex ComplexMul(Complex a, Complex b) {
+static __device__ __host__ inline Complex ComplexMul(const Complex a, const Complex b) {
   Complex c;
   c.x = a.x * b.x - a.y * b.y;
   c.y = a.x * b.y + a.y * b.x;
@@ -66,7 +66,7 @@ static __global__ void ComplexPointwiseMulConjScale(const Complex* a, const Comp
 }
 
 // Complex pointwise scaling
-static __global__ void ComplexPointwiseDiv(const Complex* a, const float *b, Complex* c, int size) {
+static __global__ void ComplexPointwiseDiv(const Complex* a, const Complex* b, Complex* c, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -76,7 +76,7 @@ static __global__ void ComplexPointwiseDiv(const Complex* a, const float *b, Com
 }
 
 // Complex pointwise scaling
-static __global__ void ComplexPointwiseScale(const Complex* a, const float *b, Complex* c, int size) {
+static __global__ void ComplexPointwiseScale(const Complex* a, const float* b, Complex* c, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -86,7 +86,7 @@ static __global__ void ComplexPointwiseScale(const Complex* a, const float *b, C
 }
 
 // Complex pointwise adding
-static __global__ void ComplexPointwiseAdd(const Complex* a, const float *b, Complex* c, int size) {
+static __global__ void ComplexPointwiseAdd(const Complex* a, const Complex* b, Complex* c, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -96,7 +96,7 @@ static __global__ void ComplexPointwiseAdd(const Complex* a, const float *b, Com
 }
 
 // Complex pointwise substracting
-static __global__ void ComplexPointwiseSub(const Complex* a, const float *b, Complex* c, int size) {
+static __global__ void ComplexPointwiseSub(const Complex* a, const Complex* b, Complex* c, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -138,7 +138,7 @@ static __global__ void ComplexFill(Complex* a, const Complex b, int size) {
 }
 
 // Complex scalar scaling
-static __global__ void ComplexConvert(const float *a, Complex* b, int size) {
+static __global__ void ComplexConvert(const float* a, Complex* b, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -149,7 +149,7 @@ static __global__ void ComplexConvert(const float *a, Complex* b, int size) {
 }
 
 // Complex pointwise multiplication
-static __global__ void RealPointwiseMul(const float* a, const float *b, float* c, int size) {
+static __global__ void RealPointwiseMul(const float* a, const float* b, float* c, int size) {
     const int numThreads = blockDim.x * gridDim.x;
     const int threadID = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -204,9 +204,9 @@ TrackerCSRT::TrackerCSRT(const cv::Mat& frame, const cv::Rect& bbox) :
     // cudaMalloc(&dTemp2, complexSize);
     
     // Apply FFT to idealResponse
-    cudaMemcpy2D(dGaussian, width * sizeof(float), idealResponse.data, width * sizeof(float), width * sizeof(float), height, cudaMemcpyHostToDevice);
+    cudaMemcpy2D(dGaussian, bbox.width * sizeof(float), idealResponse.data, bbox.width * sizeof(float), bbox.width * sizeof(float), bbox.height, cudaMemcpyHostToDevice);
     cufftHandle plan1;
-    cufftPlan2d(&plan1, height, width, CUFFT_R2C);
+    cufftPlan2d(&plan1, bbox.height, bbox.width, CUFFT_R2C);
     cufftExecR2C(plan1, dGaussian, dSrcFFT);
     cufftDestroy(plan1);
 
@@ -316,7 +316,7 @@ void TrackerCSRT::convolveCUDA(const cv::Mat1f& src, const cv::Mat1f& kernel, cv
     cufftDestroy(plan1);
 
     // Multiply elementwise srcTemp and kernel in Fourier domain
-    ComplexPointwiseMulConjScale<<<32, 256>>>(dSrcFFT, dKernelFFT, dSrcFFT, width * height, 1.0f / (width * height));
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dSrcFFT, dKernelFFT, dSrcFFT, width * height, 1.0f / (width * height * width * height * width * height));
 
     // Apply IFFT to srcTemp
     cufftHandle plan2;
@@ -386,6 +386,7 @@ void TrackerCSRT::updateLocation(cv::Rect& bbox) {
 
         // Update weight by channel learning reliability
         cv::minMaxLoc(channelConvolution, &minVal, &maxVal, &minLoc, &maxLoc);
+        std::cout << minVal << ' ' << maxVal << std::endl;
         channelWeights[channelId] = (1 - filterAdaptationRate) * channelWeights[channelId] + filterAdaptationRate * maxVal;
         weightsSum += channelWeights[channelId];
     }
@@ -421,19 +422,19 @@ void TrackerCSRT::estimateReliabilityMap(cv::Mat& map) {
 
 
 void TrackerCSRT::updateFilter() {
-    cv::Mat1f maskedFilter;
-    cv::Mat1f constrainedFilter;
-    cv::Mat1f temp1;
-    cv::Mat1f temp2;
+    // cv::Mat1f maskedFilter;
+    // cv::Mat1f constrainedFilter;
+    // cv::Mat1f temp1;
+    // cv::Mat1f temp2;
 
     cv::Mat relMap;
     estimateReliabilityMap(relMap);
 
-    int mu = 5;
-    const int beta = 3;
-    const float lambda = 0.01;
-    const int D = relMap.rows * relMap.cols;
-    const float denomIncrement = lambda / (2 * D);
+    // int mu = 5;
+    // const int beta = 3;
+    // const float lambda = 0.01;
+    // const int D = relMap.rows * relMap.cols;
+    // const float denomIncrement = lambda / (2 * D);
 
     for (int channelId = 0; channelId < channels.size(); ++channelId) {
         // cv::Mat1f filter = filters[channelId].clone();
@@ -458,14 +459,31 @@ void TrackerCSRT::updateFilter() {
         //     mu *= beta;
         // }
 
-        cv::Mat filter;
+        cv::Mat1f filter;
         estimateFilter(channelId, relMap, filter);
+
+        // TEMP CONVERT FILTERS TO COMMON RANGE
+        // cv::normalize(filters[channelId], filters[channelId], 0, 1, cv::NORM_MINMAX);
+        // cv::normalize(filter, filter, 0, 255, cv::NORM_MINMAX);
+        // cv::multiply(filter, relMap, filter);
 
         filters[channelId] = (1 - filterAdaptationRate) * filters[channelId] + filterAdaptationRate * filter;
 
-        // cv::Mat temp3;
-        // cv::normalize(filter, temp3, 0, 1, cv::NORM_MINMAX);
-        // cv::imshow("Filter", temp3);
+        cv::Mat temp3;
+        cv::normalize(filter, temp3, 0, 1, cv::NORM_MINMAX);
+        cv::imshow("Filter", temp3);
+        cv::waitKey(0);
+
+        double minVal;
+        double maxVal;
+        cv::Point minLoc;
+        cv::Point maxLoc;
+        cv::minMaxLoc(filter, &minVal, &maxVal, &minLoc, &maxLoc);
+        std::cout << minVal << ' ' << maxVal << std::endl;
+        cv::minMaxLoc(filters[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
+        std::cout << minVal << ' ' << maxVal << std::endl;
+        cv::minMaxLoc(channels[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
+        std::cout << minVal << ' ' << maxVal << std::endl;
     }
 
     // Show filter
@@ -476,11 +494,17 @@ void TrackerCSRT::updateFilter() {
 
 
 void TrackerCSRT::estimateFilter(const int channelId, const cv::Mat1f& relMap, cv::Mat1f& newFilter) {
+    int mu = 5;
+    const int beta = 3;
+    const float lambda = 0.01;
+    const int D = relMap.rows * relMap.cols;
+    const float denomIncrement = lambda / (2 * D);
+
     cv::Mat1f oldFilter = filters[channelId];
     cv::Mat1f trainROI = channels[channelId];
 
-    size_t width = old_filter.cols;
-    size_t height = old_filter.rows;
+    size_t width = oldFilter.cols;
+    size_t height = oldFilter.rows;
 
     float* dOldFilter = dSrc;
     float* dTrainROI = dKernel;
@@ -505,18 +529,19 @@ void TrackerCSRT::estimateFilter(const int channelId, const cv::Mat1f& relMap, c
     cufftPlan2d(&plan2, height, width, CUFFT_C2R);
 
     // Apply FFT to srcTemp and kernel
-    // cufftExecR2C(plan1, dSrc, dSrcFFT);
     cufftExecR2C(plan1, dTrainROI, dTrainROIFFT);
 
     // Multiply elementwise srcTemp and kernel in Fourier domain
-    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dGaussianFFT, dConv1, width * height, 1.0f / (width * height));
-    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dTrainROIFFT, dConv2, width * height, 1.0f / (width * height));
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dGaussianFFT, dConv1, width * height, 1.0f / (width * height * width * height * width * height));
+    ComplexPointwiseMulConjScale<<<32, 256>>>(dTrainROIFFT, dTrainROIFFT, dConv2, width * height, 1.0f / (width * height * width * height * width * height));
 
-    int iter = 3;
+    int iter = 1;
 
     while (iter--) {
         // Masked filter
-        ComplexPointwiseScale<<<32, 256>>>(dOldFilterFFT, dRelMap, dOldFilterFFT, width * height);
+        // ComplexPointwiseScale<<<32, 256>>>(dOldFilterFFT, dRelMap, dOldFilterFFT, width * height);
+        RealPointwiseMul<<<32, 256>>>(dOldFilter, dRelMap, dOldFilter, width * height);
+        cufftExecR2C(plan1, dOldFilter, dOldFilterFFT);
 
         // Calculate constrained filter into dOldFilterFFT
         ComplexScalarScale<<<32, 256>>>(dOldFilterFFT, filterAdaptationRate, dOldFilterFFT, width * height);
@@ -534,14 +559,14 @@ void TrackerCSRT::estimateFilter(const int channelId, const cv::Mat1f& relMap, c
 
         RealPointwiseMul<<<32, 256>>>(dRelMap, dOldFilter, dOldFilter, width * height);
         RealScalarMul<<<32, 256>>>(dOldFilter, 1 / (denomIncrement + mu), dOldFilter, width * height);
-
+/*
         // Update Lagrangian
         cufftExecR2C(plan1, dOldFilter, dTemp1);
         ComplexPointwiseSub<<<32, 256>>>(dOldFilterFFT, dTemp1, dTemp1, width * height);
         ComplexScalarScale<<<32, 256>>>(dTemp1, filterAdaptationRate, dTemp1, width * height);
         ComplexPointwiseAdd<<<32, 256>>>(dLagrangianFFT, dTemp1, dLagrangianFFT, width * height);
 
-        mu *= beta;
+        mu *= beta; */
     }
 
     cufftDestroy(plan1);
