@@ -235,9 +235,19 @@ TrackerCSRT::~TrackerCSRT() {
 
 
 bool TrackerCSRT::update(const cv::Mat& frame, cv::Rect& bbox) {
+    // Check if bbox is in frame bounds
+    if ((bbox & cv::Rect(0, 0, frame.cols, frame.rows)) != bbox) {
+        return false;
+    }
+
     updateChannels(frame, bbox);
 
     updateLocation(bbox);
+
+    // Check if bbox is in frame bounds
+    if ((bbox & cv::Rect(0, 0, frame.cols, frame.rows)) != bbox) {
+        return false;
+    }
 
     updateChannels(frame, bbox);
     
@@ -386,7 +396,7 @@ void TrackerCSRT::updateLocation(cv::Rect& bbox) {
 
         // Update weight by channel learning reliability
         cv::minMaxLoc(channelConvolution, &minVal, &maxVal, &minLoc, &maxLoc);
-        std::cout << minVal << ' ' << maxVal << std::endl;
+        // std::cout << minVal << ' ' << maxVal << std::endl;
         channelWeights[channelId] = (1 - filterAdaptationRate) * channelWeights[channelId] + filterAdaptationRate * maxVal;
         weightsSum += channelWeights[channelId];
     }
@@ -463,27 +473,27 @@ void TrackerCSRT::updateFilter() {
         estimateFilter(channelId, relMap, filter);
 
         // TEMP CONVERT FILTERS TO COMMON RANGE
-        // cv::normalize(filters[channelId], filters[channelId], 0, 1, cv::NORM_MINMAX);
-        // cv::normalize(filter, filter, 0, 255, cv::NORM_MINMAX);
+        cv::normalize(filters[channelId], filters[channelId], 0, 255, cv::NORM_MINMAX);
+        cv::normalize(filter, filter, 0, 255, cv::NORM_MINMAX);
         // cv::multiply(filter, relMap, filter);
 
         filters[channelId] = (1 - filterAdaptationRate) * filters[channelId] + filterAdaptationRate * filter;
 
-        cv::Mat temp3;
-        cv::normalize(filter, temp3, 0, 1, cv::NORM_MINMAX);
-        cv::imshow("Filter", temp3);
-        cv::waitKey(0);
+        // cv::Mat temp3;
+        // cv::normalize(filter, temp3, 0, 1, cv::NORM_MINMAX);
+        // cv::imshow("Filter", temp3);
+        // cv::waitKey(0);
 
-        double minVal;
-        double maxVal;
-        cv::Point minLoc;
-        cv::Point maxLoc;
-        cv::minMaxLoc(filter, &minVal, &maxVal, &minLoc, &maxLoc);
-        std::cout << minVal << ' ' << maxVal << std::endl;
-        cv::minMaxLoc(filters[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
-        std::cout << minVal << ' ' << maxVal << std::endl;
-        cv::minMaxLoc(channels[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
-        std::cout << minVal << ' ' << maxVal << std::endl;
+        // double minVal;
+        // double maxVal;
+        // cv::Point minLoc;
+        // cv::Point maxLoc;
+        // cv::minMaxLoc(filter, &minVal, &maxVal, &minLoc, &maxLoc);
+        // std::cout << minVal << ' ' << maxVal << std::endl;
+        // cv::minMaxLoc(filters[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
+        // std::cout << minVal << ' ' << maxVal << std::endl;
+        // cv::minMaxLoc(channels[channelId], &minVal, &maxVal, &minLoc, &maxLoc);
+        // std::cout << minVal << ' ' << maxVal << std::endl;
     }
 
     // Show filter
@@ -559,14 +569,14 @@ void TrackerCSRT::estimateFilter(const int channelId, const cv::Mat1f& relMap, c
 
         RealPointwiseMul<<<32, 256>>>(dRelMap, dOldFilter, dOldFilter, width * height);
         RealScalarMul<<<32, 256>>>(dOldFilter, 1 / (denomIncrement + mu), dOldFilter, width * height);
-/*
+
         // Update Lagrangian
         cufftExecR2C(plan1, dOldFilter, dTemp1);
         ComplexPointwiseSub<<<32, 256>>>(dOldFilterFFT, dTemp1, dTemp1, width * height);
         ComplexScalarScale<<<32, 256>>>(dTemp1, filterAdaptationRate, dTemp1, width * height);
         ComplexPointwiseAdd<<<32, 256>>>(dLagrangianFFT, dTemp1, dLagrangianFFT, width * height);
 
-        mu *= beta; */
+        mu *= beta;
     }
 
     cufftDestroy(plan1);
